@@ -1,6 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import * as XLSX from "xlsx";
+import {
+  CartesianGrid,
+  ResponsiveContainer,
+  ScatterChart,
+  Scatter,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ReferenceLine,
+} from "recharts";
 
 type AssessmentResult = {
   name: string;
@@ -114,85 +125,112 @@ export default function Home() {
     }
   }
 
-  function downloadCSV() {
+  function riskColor(riskBand: AssessmentResult["risk_band"]) {
+    switch (riskBand) {
+      case "Severe":
+        return "#dc2626";
+      case "High":
+        return "#ea580c";
+      case "Moderate":
+        return "#ca8a04";
+      case "Low":
+        return "#16a34a";
+      default:
+        return "#6b7280";
+    }
+  }
+
+  function downloadExcel() {
     if (results.length === 0) return;
 
-    const headers = [
-  "name",
-  "type",
-  "bri_score",
-  "risk_band",
-  "strategic_value",
-  "strategic_value_label",
-  "confidence",
-  "task_standardization",
-  "digital_executability",
-  "rules_clarity",
-  "decomposability",
-  "data_structure",
-  "verifiability",
-  "speed_volume_pressure",
-  "human_relational_intensity",
-  "contextual_judgment",
-  "regulatory_trust_friction",
-  "buyer_willingness",
-  "tooling_maturity",
-  "executive_action_now",
-  "h1_strategy",
-  "h2_strategy",
-  "h3_strategy",
-  "reasoning",
-];
+    const workbook = XLSX.utils.book_new();
 
-    const escapeCSV = (value: string | number) => {
-      const str = String(value ?? "");
-      return `"${str.replace(/"/g, '""')}"`;
-    };
+    const summaryRows = results.map((result) => ({
+      Name: result.name,
+      Type: result.type,
+      "BRI Score": result.bri_score,
+      "Risk Band": result.risk_band,
+      "Strategic Value": result.strategic_value,
+      "Strategic Value Label": result.strategic_value_label,
+      Confidence: `${Math.round(result.confidence * 100)}%`,
+      "Task Standardization": result.parameter_scores.task_standardization,
+      "Digital Executability": result.parameter_scores.digital_executability,
+      "Rules Clarity": result.parameter_scores.rules_clarity,
+      Decomposability: result.parameter_scores.decomposability,
+      "Data Structure": result.parameter_scores.data_structure,
+      Verifiability: result.parameter_scores.verifiability,
+      "Speed / Volume Pressure": result.parameter_scores.speed_volume_pressure,
+      "Human Relational Intensity": result.parameter_scores.human_relational_intensity,
+      "Contextual Judgment": result.parameter_scores.contextual_judgment,
+      "Regulatory / Trust Friction": result.parameter_scores.regulatory_trust_friction,
+      "Buyer Willingness": result.parameter_scores.buyer_willingness,
+      "Tooling Maturity": result.parameter_scores.tooling_maturity,
+      "Executive Action Now": result.executive_action_now,
+      H1: result.h1_strategy,
+      H2: result.h2_strategy,
+      H3: result.h3_strategy,
+      Reasoning: result.reasoning,
+    }));
 
-    const rows = results.map((result) => [
-  result.name,
-  result.type,
-  result.bri_score,
-  result.risk_band,
-  result.strategic_value,
-  result.strategic_value_label,
-  `${Math.round(result.confidence * 100)}%`,
-  result.parameter_scores.task_standardization,
-  result.parameter_scores.digital_executability,
-  result.parameter_scores.rules_clarity,
-  result.parameter_scores.decomposability,
-  result.parameter_scores.data_structure,
-  result.parameter_scores.verifiability,
-  result.parameter_scores.speed_volume_pressure,
-  result.parameter_scores.human_relational_intensity,
-  result.parameter_scores.contextual_judgment,
-  result.parameter_scores.regulatory_trust_friction,
-  result.parameter_scores.buyer_willingness,
-  result.parameter_scores.tooling_maturity,
-  result.executive_action_now,
-  result.h1_strategy,
-  result.h2_strategy,
-  result.h3_strategy,
-  result.reasoning,
-]);
+    const summarySheet = XLSX.utils.json_to_sheet(summaryRows);
 
-    const csv = [
-      headers.join(","),
-      ...rows.map((row) => row.map(escapeCSV).join(",")),
-    ].join("\n");
+    summarySheet["!cols"] = [
+      { wch: 32 },
+      { wch: 12 },
+      { wch: 10 },
+      { wch: 12 },
+      { wch: 14 },
+      { wch: 20 },
+      { wch: 12 },
+      { wch: 18 },
+      { wch: 22 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 14 },
+      { wch: 20 },
+      { wch: 24 },
+      { wch: 20 },
+      { wch: 24 },
+      { wch: 18 },
+      { wch: 16 },
+      { wch: 28 },
+      { wch: 40 },
+      { wch: 40 },
+      { wch: 40 },
+      { wch: 50 },
+    ];
 
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
+    XLSX.utils.book_append_sheet(workbook, summarySheet, "Assessment Summary");
 
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", "agenticgps-results.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const matrixRows = results.map((result) => ({
+      Name: result.name,
+      BRI: result.bri_score,
+      "Strategic Value": result.strategic_value,
+      "Risk Band": result.risk_band,
+      "Strategic Value Label": result.strategic_value_label,
+    }));
 
-    URL.revokeObjectURL(url);
+    const matrixSheet = XLSX.utils.json_to_sheet(matrixRows);
+    matrixSheet["!cols"] = [
+      { wch: 32 },
+      { wch: 10 },
+      { wch: 16 },
+      { wch: 12 },
+      { wch: 20 },
+    ];
+
+    XLSX.utils.book_append_sheet(workbook, matrixSheet, "2x2 Matrix Data");
+
+    XLSX.writeFileXLSX(workbook, "agenticgps-results.xlsx");
   }
+
+  const chartData = results.map((result) => ({
+    name: result.name,
+    bri: result.bri_score,
+    strategicValue: result.strategic_value,
+    riskBand: result.risk_band,
+  }));
 
   return (
     <main className="min-h-screen bg-white text-gray-900">
@@ -264,11 +302,11 @@ Data Engineer`}
               </div>
 
               <button
-                onClick={downloadCSV}
+                onClick={downloadExcel}
                 disabled={results.length === 0}
                 className="rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Download CSV
+                Download Excel
               </button>
             </div>
 
@@ -280,6 +318,82 @@ Data Engineer`}
 
             {results.length > 0 && (
               <>
+                <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-4">
+                  <h3 className="text-lg font-semibold">Portfolio 2x2 Matrix</h3>
+                  <p className="mt-1 text-sm text-gray-600">
+                    X-axis = BRI, Y-axis = Strategic Value
+                  </p>
+
+                  <div className="mt-4 h-[360px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                        <CartesianGrid />
+                        <XAxis
+                          type="number"
+                          dataKey="bri"
+                          name="BRI"
+                          domain={[0, 100]}
+                          label={{ value: "BRI", position: "insideBottom", offset: -10 }}
+                        />
+                        <YAxis
+                          type="number"
+                          dataKey="strategicValue"
+                          name="Strategic Value"
+                          domain={[1, 5]}
+                          ticks={[1, 2, 3, 4, 5]}
+                          label={{ value: "Strategic Value", angle: -90, position: "insideLeft" }}
+                        />
+                        <ReferenceLine x={60} stroke="#9ca3af" strokeDasharray="4 4" />
+                        <ReferenceLine y={4} stroke="#9ca3af" strokeDasharray="4 4" />
+                        <Tooltip
+                          cursor={{ strokeDasharray: "3 3" }}
+                          formatter={(value, name) => [value, name]}
+                          labelFormatter={(_, payload) => {
+                            if (payload && payload.length > 0) {
+                              return payload[0].payload.name;
+                            }
+                            return "";
+                          }}
+                        />
+                        <Scatter
+                          data={chartData}
+                          shape={(props: any) => {
+                            const { cx, cy, payload } = props;
+                            return (
+                              <circle
+                                cx={cx}
+                                cy={cy}
+                                r={8}
+                                fill={riskColor(payload.riskBand)}
+                                stroke="#111827"
+                              />
+                            );
+                          }}
+                        />
+                      </ScatterChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-4 text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-block h-3 w-3 rounded-full bg-red-600" />
+                      Severe
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="inline-block h-3 w-3 rounded-full bg-orange-600" />
+                      High
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="inline-block h-3 w-3 rounded-full bg-yellow-500" />
+                      Moderate
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="inline-block h-3 w-3 rounded-full bg-green-600" />
+                      Low
+                    </div>
+                  </div>
+                </div>
+
                 <div className="mt-6 overflow-x-auto rounded-xl border border-gray-200">
                   <table className="min-w-full bg-white text-sm">
                     <thead className="bg-gray-50">

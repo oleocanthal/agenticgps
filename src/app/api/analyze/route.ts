@@ -2,9 +2,15 @@ import OpenAI from "openai";
 import { NextResponse } from "next/server";
 import { AppSettings, defaultSettings } from "@/lib/default-settings";
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+function getOpenAIClient() {
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error("Missing OPENAI_API_KEY");
+  }
+
+  return new OpenAI({ apiKey });
+}
 
 function buildSystemPrompt() {
   return `
@@ -324,6 +330,8 @@ Return JSON only with this exact structure:
 
 export async function POST(req: Request) {
   try {
+    const client = getOpenAIClient();
+
     const body = await req.json();
     const {
       companyContext,
